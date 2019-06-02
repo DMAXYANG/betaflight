@@ -94,6 +94,14 @@
 #include "fc/runtime_config.h"
 #include "fc/rc_modes.h"
 
+
+#include "cms/cms.h"
+
+#include "rx/crsf.h"
+#include "rx/rx.h"
+#include "pg/rx.h"
+
+
 #if defined(USE_BRAINFPV_OSD) | 1
 
 PG_REGISTER_WITH_RESET_TEMPLATE(bfOsdConfig_t, bfOsdConfig, PG_BRAINFPV_CONFIG, 0);
@@ -127,6 +135,10 @@ PG_RESET_TEMPLATE(bfOsdConfig_t, bfOsdConfig,
   .hd_frame_height = 55,
   .hd_frame_h_offset = 0,
   .hd_frame_v_offset = 0,
+  .crsf_link_stats = 1,
+  .crsf_link_stats_power = 1,
+  .crsf_link_stats_rssi = 2,
+  .crsf_link_stats_snr = 1,
 );
 
 const char * const gitTag = __GIT_TAG__;
@@ -139,6 +151,12 @@ extern uint8_t *disp_buffer;
 
 extern bool cmsInMenu;
 bool osd_arming_or_stats = false;
+extern bool osdStatsVisible;
+bool osdArming = false;
+
+extern crsfLinkInfo_t crsf_link_info;
+static bool show_crsf_link_info;
+
 bool brainfpv_user_avatar_set = false;
 bool brainfpv_hd_frame_menu = false;
 extern bfOsdConfig_t bfOsdConfigCms;
@@ -206,26 +224,15 @@ uint8_t max7456GetRowsCount(void)
 
 void max7456Write(uint8_t x, uint8_t y, const char *buff)
 {
-    uint8_t font = bfOsdConfig()->font;
 
-    if (font >= NUM_FONTS) {
-        font = NUM_FONTS - 1;
-    }
-
-    write_string(buff, MAX_X(x), MAX_Y(y), 0, 0, TEXT_VA_TOP, TEXT_HA_LEFT, font);
+    write_string(buff, MAX_X(x), MAX_Y(y), 0, 0, TEXT_VA_TOP, TEXT_HA_LEFT, bf_font());
 }
 
 void max7456WriteChar(uint8_t x, uint8_t y, uint8_t c)
 {
     char buff[2] = {c, 0};
 
-    uint8_t font = bfOsdConfig()->font;
-
-    if (font >= NUM_FONTS) {
-        font = NUM_FONTS - 1;
-    }
-
-    write_string(buff, MAX_X(x), MAX_Y(y), 0, 0, TEXT_VA_TOP, TEXT_HA_LEFT, font);
+    write_string(buff, MAX_X(x), MAX_Y(y), 0, 0, TEXT_VA_TOP, TEXT_HA_LEFT, bf_font());
 }
 
 void max7456ClearScreen(void)
@@ -257,6 +264,12 @@ void brainFpvOsdInit(void)
             brainfpv_user_avatar_set = true;
             break;
         }
+    }
+    if (bfOsdConfig()->crsf_link_stats && (rxConfig()->serialrx_provider == SERIALRX_CRSF)) {
+        show_crsf_link_info = true;
+    }
+    else {
+        show_crsf_link_info = false;
     }
 }
 
@@ -670,6 +683,48 @@ void draw_hd_frame(const bfOsdConfig_t * config)
             write_vline_lm(x2, y1, y1 + HD_FRAME_CORNER_LEN, 1, 1);
             write_vline_lm(x2, y2 - HD_FRAME_CORNER_LEN, y2, 1, 1);
             break;
+    }
+}
+
+#define CRSF_LINE_SPACING 12
+
+void osdElementRssi(osdElementParms_t *element);
+void osdElementRssi_BrainFPV(osdElementParms_t *element)
+{
+    if (!show_crsf_link_info) {
+        osdElementRssi(element);
+    }
+    else {
+        char tmp_str[20];
+
+        uint16_t x_pos = MAX_X(element->elemPosX);
+        uint16_t y_pos = MAX_Y(element->elemPosY);
+
+        bool lq_alarm = (crsf_link_info.lq < osdConfig()->rssi_alarm);
+
+        tfp_sprintf(tmp_str, "%c%d", SYM_RSSI, crsf_link_info.lq);
+        write_string(tmp_str, x_pos, y_pos, 0, 0, TEXT_VA_TOP, TEXT_HA_LEFT, bf_font());
+        y_pos += 16;
+
+        if (bfOsdConfig()->crsf_link_stats_power) {
+            tfp_sprintf(tmp_str, "%dmW", crsf_link_info.tx_power);
+            write_string(tmp_str, x_pos, y_pos, 0, 0, TEXT_VA_TOP, TEXT_HA_LEFT, FONT8X10);
+            y_pos += CRSF_LINE_SPACING;
+        }
+
+        if ((bfOsdConfig()->crsf_link_stats_rssi == 2) || ((bfOsdConfig()->crsf_link_stats_rssi == 1) && lq_alarm)) {
+            tfp_sprintf(tmp_str, "%ddBm", -1 * (int16_t)crsf_link_info.rssi);
+            write_string(tmp_str, x_pos, y_pos, 0, 0, TEXT_VA_TOP, TEXT_HA_LEFT, FONT8X10);
+            y_pos += CRSF_LINE_SPACING;
+        }
+
+        if ((bfOsdConfig()->crsf_link_stats_snr == 2) || ((bfOsdConfig()->crsf_link_stats_snr == 1) && lq_alarm)) {
+            tfp_sprintf(tmp_str, "SN %ddB", crsf_link_info.snr);
+            write_string(tmp_str, x_pos, y_pos, 0, 0, TEXT_VA_TOP, TEXT_HA_LEFT, FONT8X10);
+        }
+
+        // set the RSSI for other things in betaflight
+        setRssiCrsfLq(crsf_link_info.lq);
     }
 }
 
