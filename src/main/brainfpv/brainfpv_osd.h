@@ -62,6 +62,6 @@ void brainFpvOsdCenterMark(void);
 void brainFpvOsdUserLogo(uint16_t x, uint16_t y);
 void brainFpvOsdMainLogo(uint16_t x, uint16_t y);
 
-void osdElementRssi_BrainFPV(osdElementParms_t *element);
+bool osdElementRssi_BrainFPV(uint16_t x_pos, uint16_t y_pos);
 
 #endif /* BRAINFPV_OSD */

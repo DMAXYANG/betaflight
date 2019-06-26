@@ -473,14 +473,18 @@ static bool osdDrawSingleElement(uint8_t item)
     switch (item) {
     case OSD_RSSI_VALUE:
         {
-            uint16_t osdRssi = getRssi() * 100 / 1024; // change range
-            if (osdRssi >= 100)
-                osdRssi = 99;
+            if (osdElementRssi_BrainFPV(elemPosX, elemPosY)) {
+                brainfpv_item = true;
+            }
+            else {
+                uint16_t osdRssi = getRssi() * 100 / 1024; // change range
+                if (osdRssi >= 100)
+                    osdRssi = 99;
 
-            tfp_sprintf(buff, "%c%2d", SYM_RSSI, osdRssi);
+                tfp_sprintf(buff, "%c%2d", SYM_RSSI, osdRssi);
+            }
             break;
         }
-
     case OSD_MAIN_BATT_VOLTAGE:
         buff[0] = osdGetBatterySymbol(osdGetBatteryAverageCellVoltage());
         tfp_sprintf(buff + 1, "%2d.%1d%c", getBatteryVoltage() / 10, getBatteryVoltage() % 10, SYM_VOLT);

@@ -183,6 +183,18 @@ enum BrainFPVOSDMode {
 
 uint16_t maxScreenSize = VIDEO_BUFFER_CHARS_PAL;
 
+
+static uint8_t bf_font(void)
+{
+    uint8_t font = bfOsdConfig()->font;
+
+    if (font >= NUM_FONTS) {
+        font = NUM_FONTS - 1;
+    }
+
+    return font;
+}
+
 bool max7456Init(const struct max7456Config_s *max7456Config, const struct vcdProfile_s *vcdProfile, bool cpuOverclock)
 {
     (void)max7456Config;
@@ -690,21 +702,17 @@ void draw_hd_frame(const bfOsdConfig_t * config)
 
 #define CRSF_LINE_SPACING 12
 
-void osdElementRssi(osdElementParms_t *element);
-void osdElementRssi_BrainFPV(osdElementParms_t *element)
+bool osdElementRssi_BrainFPV(uint16_t x_pos, uint16_t y_pos)
 {
     if (!show_crsf_link_info) {
-        osdElementRssi(element);
+        return false;
     }
     else {
         char tmp_str[20];
-
-        uint16_t x_pos = MAX_X(element->elemPosX);
-        uint16_t y_pos = MAX_Y(element->elemPosY);
-
-        //bool lq_alarm = (crsf_link_info.lq < osdConfig()->rssi_alarm);
-        //bool snr_alarm = (crsf_link_info.lq < osdConfig()->rssi_alarm);
         bool show;
+
+        x_pos = MAX_X(x_pos);
+        y_pos = MAX_Y(y_pos);
 
         tfp_sprintf(tmp_str, "%c%d", SYM_RSSI, crsf_link_info.lq);
         write_string(tmp_str, x_pos, y_pos, 0, 0, TEXT_VA_TOP, TEXT_HA_LEFT, bf_font());
@@ -760,6 +768,8 @@ void osdElementRssi_BrainFPV(osdElementParms_t *element)
         // set the RSSI for other things in betaflight
         setRssiCrsfLq(crsf_link_info.lq);
     }
+
+    return true;
 }
 
 #endif /* USE_BRAINFPV_OSD */
